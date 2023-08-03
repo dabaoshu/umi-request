@@ -2,14 +2,15 @@ import Onion from './onion';
 import addfixInterceptor from './interceptor/addfix';
 import fetchMiddleware from './middleware/fetch';
 import parseResponseMiddleware from './middleware/parseResponse';
-import type { Middleware, Context, RequestOptionsInit } from "./typing"
-import { MapCache, mergeRequestOptions } from './utils';
+import type { Middleware, Context, RequestOptionsInit } from './typing';
+import { mergeRequestOptions } from './utils';
 import simpleGetMiddleware from './middleware/simpleGet';
 import simplePostMiddleware from './middleware/simplePost';
-
+import cacheMiddleware from './middleware/cache';
+import { MapCache } from './cache';
 
 // 初始化全局和内核中间件
-const globalMiddlewares = [simplePostMiddleware, simpleGetMiddleware, parseResponseMiddleware];
+const globalMiddlewares = [cacheMiddleware, simplePostMiddleware, simpleGetMiddleware, parseResponseMiddleware];
 const coreMiddlewares = [fetchMiddleware];
 
 Onion.globalMiddlewares = globalMiddlewares;
@@ -17,13 +18,13 @@ Onion.defaultGlobalMiddlewaresLength = globalMiddlewares.length;
 Onion.coreMiddlewares = coreMiddlewares;
 Onion.defaultCoreMiddlewaresLength = coreMiddlewares.length;
 
-
 /**
  * core
  * request的请求缓存配置保存对象
  */
 class Core {
   constructor(initOptions: RequestOptionsInit) {
+    this.mapCache = new MapCache(initOptions);
     // 洋葱模型实例
     this.onion = new Onion<Context>([]);
     // 初始化配置
@@ -32,19 +33,17 @@ class Core {
     this.instanceRequestInterceptors = [];
     // 响应拦截器
     this.instanceResponseInterceptors = [];
-    // 缓存
-    this.mapCache = new MapCache(initOptions);
   }
-  // 缓存
-  mapCache: MapCache
+
+  mapCache: MapCache;
   // 洋葱模型
-  onion: Onion<Context>
+  onion: Onion<Context>;
   // 初始化配置
-  initOptions: RequestOptionsInit
+  initOptions: RequestOptionsInit;
   /**实例请求拦截器 */
-  instanceRequestInterceptors = []
+  instanceRequestInterceptors = [];
   /** 实例响应拦截器*/
-  instanceResponseInterceptors = []
+  instanceResponseInterceptors = [];
   /**  全局请求拦截器*/
   static requestInterceptors = [addfixInterceptor];
   /**  全局相应拦截器*/
@@ -82,8 +81,8 @@ class Core {
 
   // 执行请求前拦截器
   dealRequestInterceptors(ctx: Context) {
-    type ReqPromise = Promise<Partial<Context['req']>>
-    type reducerPromiseFn = (url: string, options?: RequestOptionsInit) => ReqPromise
+    type ReqPromise = Promise<Partial<Context['req']>>;
+    type reducerPromiseFn = (url: string, options?: RequestOptionsInit) => ReqPromise;
     const reducer = (p1: ReqPromise, p2: reducerPromiseFn) =>
       p1.then((ret = {}) => {
         ctx.req.url = ret.url || ctx.req.url;
@@ -107,8 +106,8 @@ class Core {
       req: { url, options: { ...options, url } },
       res: null,
       cache: this.mapCache,
-      responseInterceptors: [...Core.responseInterceptors, ...this.instanceResponseInterceptors],
-    } as Context
+      __responseInterceptors__: [...Core.responseInterceptors, ...this.instanceResponseInterceptors],
+    } as Context;
     if (typeof url !== 'string') {
       throw new Error('url MUST be a string');
     }
@@ -119,7 +118,7 @@ class Core {
         .then(() => {
           resolve(obj.res);
         })
-        .catch(error => {
+        .catch((error) => {
           const { errorHandler } = obj.req.options;
           if (errorHandler) {
             try {
@@ -136,5 +135,4 @@ class Core {
   }
 }
 
-
-export default Core
+export default Core;

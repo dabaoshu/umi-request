@@ -1,7 +1,7 @@
 import { safeJsonParse, readerGBK, ResponseError, getEnv, RequestError } from '../utils';
 
 export default function parseResponseMiddleware(ctx, next) {
-  let copy: any
+  let copy: any;
   return next()
     .then(() => {
       if (!ctx) return;
@@ -34,12 +34,12 @@ export default function parseResponseMiddleware(ctx, next) {
           return res
             .blob()
             .then(readerGBK)
-            .then(d => safeJsonParse(d, false, copy, req));
+            .then((d) => safeJsonParse(d, false, copy, req));
         } catch (e) {
           throw new ResponseError(copy, e.message, null, req, 'ParseError');
         }
       } else if (responseType === 'json') {
-        return res.text().then(d => safeJsonParse(d, throwErrIfParseFail, copy, req));
+        return res.text().then((d) => safeJsonParse(d, throwErrIfParseFail, copy, req));
       }
       try {
         // 其他如text, blob, arrayBuffer, formData
@@ -48,7 +48,7 @@ export default function parseResponseMiddleware(ctx, next) {
         throw new ResponseError(copy, 'responseType not support', null, req, 'ParseError');
       }
     })
-    .then(body => {
+    .then((body) => {
       if (!ctx) return;
       const { res = {}, req = {} } = ctx;
       const { options: { getResponse = false } = {} } = req || {};
@@ -57,6 +57,7 @@ export default function parseResponseMiddleware(ctx, next) {
         return;
       }
       if (copy.status >= 200 && copy.status < 300) {
+        ctx.__originRes__ = copy;
         // 提供源response, 以便自定义处理
         if (getResponse) {
           ctx.res = { data: body, response: copy };
@@ -67,7 +68,7 @@ export default function parseResponseMiddleware(ctx, next) {
       }
       throw new ResponseError(copy, 'http error', body, req, 'HttpError');
     })
-    .catch(e => {
+    .catch((e) => {
       if (e instanceof RequestError || e instanceof ResponseError) {
         throw e;
       }
